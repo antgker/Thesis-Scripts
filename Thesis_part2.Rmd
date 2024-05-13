@@ -1,0 +1,220 @@
+---
+title: "Thesis2"
+output: html_document
+date: "2024-03-21"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r pressure, echo=FALSE}
+library(Seurat)
+obj <- readRDS("C:/Users/Antonia/Desktop/ANTONIA/MTLS/ThesisProject/dev_processed.rds")
+```
+
+
+```{r}
+head(obj@meta.data, 5)
+```
+
+```{r}
+Features(obj)
+```
+
+```{r}
+number.of.genes <- nrow(obj)
+number.of.cells <- ncol(obj)
+
+cat(sprintf("Number of genes: %s\nNumber of cells: %s", number.of.genes, number.of.cells))
+```
+```{r active identity change}
+Idents(obj) = "lineage"
+```
+
+```{r to check data stucture}
+DimPlot(obj, reduction = "umap", label = TRUE)
+```
+
+
+```{r visualize QC metrics}
+# Visualize QC metrics as a violin plot
+VlnPlot(obj, features = c("nFeature_RNA", "nCount_RNA"), ncol = 2, pt.size = 0)
+```
+
+
+Single-cell data typically contain a large number of “samples” (cells). Due to the size of the count matrix and the high frequency of 0 values, Seurat stores the data in a “sparse matrix” format to save memory.
+
+You can access the raw data using the GetAssayData method and specify that you want to collect the raw expression matrix by adding the argument slot = "counts". Note that this matrix is the same as the data matrix that we used to create our Seurat object, just in a different format. It’s important to know how to export data from the Seurat object as well, for example when you need to apply a method that is not available from the Seurat R package.
+
+This format is only useful when the data contains a lot of 0 values, which is the case for scRNA-seq data. Using this format, the 0 values aren’t actually stored in memory which saves a lot of space.
+
+```{r}
+sparse.exprMat <- GetAssayData(obj, slot = "counts")
+sparse.exprMat[1:5, 1:5]
+```
+
+Make a histogram of the total number of unique genes detected per cell (nFeature_RNA) using the Seurat object. Then, highlight the 2nd standard deviation from the mean as vertical lines.
+
+```{r histogram of genes/cell}
+# plot histogram
+hist(obj$nFeature_RNA, breaks = 50) 
+abline(v = mean(obj$nFeature_RNA) - 2*sd(obj$nFeature_RNA), col = "red", lty = "longdash", lwd = 2)
+abline(v = mean(obj$nFeature_RNA) + 2*sd(obj$nFeature_RNA), col = "red", lty = "longdash", lwd = 2)
+```
+
+```{r active identity change}
+Idents(obj) = "age_range"
+```
+
+```{r}
+obj$age_range <- factor(obj$age_range, levels = c("2nd trimester", "3rd trimester", "0-1 years", "1-2 years", "2-4 years", "4-10 years", "10-20 years", "Adult"))
+```
+
+
+```{r vlnplot for age_range}
+library(ggplot2)
+
+vln_plot <- VlnPlot(obj, features = c("ENSG00000187147", "ENSG00000144218"), pt.size = 0, ncol = 2, group.by = "age_range")
+
+ggsave("vln_plot_AgeRangeReport.png", plot = vln_plot, width = 10, height = 7)  
+```
+
+```{r active identity change}
+Idents(obj) = "region"
+```
+
+```{r Vln plot for brain_regions}
+vln_plot <- VlnPlot(obj, features = c("ENSG00000170315", "ENSG00000150991", "ENSG00000187147", "ENSG00000144218"), pt.size = 0, ncol = 4)
+
+ggsave("vln_plot_BrainRegionReport2.png", plot = vln_plot, width = 10, height = 7)  
+```
+
+```{r Vln plot for brain_regions}
+vln_plot <- VlnPlot(obj, features = "ENSG00000144218", pt.size = 0)
+
+ggsave("vln_plot_BrainRegionReport2.png", plot = vln_plot, width = 10, height = 7)  
+```
+
+```{r active identity change}
+Idents(obj) = "lineage"
+```
+
+```{r feature plot for RNF220 gene in cell lineages}
+ftr_plot <- FeaturePlot(obj, features = "ENSG00000187147", label = TRUE, raster = FALSE, label.size = 7)
+
+ggsave("feature_plot_RNF220Lineage.png", plot = ftr_plot, width = 15, height = 10) 
+```
+
+```{r Vln plot for lineage Supplementary}
+vln_plot <- VlnPlot(obj, features = c("ENSG00000166233" ,"ENSG00000166167","ENSG00000198561","ENSG00000170315","ENSG00000150991","ENSG00000168036","ENSG00000187147","ENSG00000144218",), pt.size = 0, ncol = 4)
+
+ggsave("vln_plot_LineageSupplementary.png", plot = vln_plot, width = 10, height = 7)  
+```
+
+
+```{r}
+DoHeatmap(object = obj, features = c("ENSG00000166233" , "ENSG00000166167", "ENSG00000163904", "ENSG00000198561", "ENSG00000170315", "ENSG00000150991", "ENSG00000118503", "ENSG00000168036", "ENSG00000187147", "ENSG00000089225", "ENSG00000144218", "ENSG00000164690"))
+```
+
+
+```{r}
+
+# library(Seurat)
+# library(glmGamPoi)
+# library(Matrix)
+# library(tictoc)
+# library(Hmisc)
+# library(moments)
+# library(CorrelationGene)
+# library(biomaRt)
+# library(devtools)
+library(EWCE)
+library(ggplot2)
+
+
+Idents(obj) = "lineage"
+obj_sub = subset(obj, subset = age_range == "1-2 years")
+
+dropped = EWCE::drop_uninformative_genes(
+  exp = obj_subset@assays$RNA@data,
+  level2annot = obj_subset$lineage,
+  species =  "human",
+  input_species = "human",
+  no_cores = 20
+)
+
+
+# I am not completely sure about the annotation levels, but this works
+annotlevels = list(level1class = obj_subset$lineage, level2class = obj_subset$lineage)
+
+generate_ctd = EWCE::generate_celltype_data(
+  exp = dropped,
+  annotLevels = annotlevels,
+  groupName = "ctd_1",
+  no_cores = 20
+)
+
+my_ctd = EWCE::load_rdata(generate_ctd)
+save(my_ctd, file = "dev_ctd.rda")
+
+gene_list1 = c("ENSG00000168036", "ENSG00000187147", "ENSG00000144218")
+
+#specificity plot for RNF220, CTNNB1, AFF3
+pdf("EWCE_plot_ctd_specificity1.pdf")
+try({
+  plt = EWCE::plot_ctd(ctd = my_ctd,
+                       level = 1,
+                       genes = gene_list1, 
+                       metric = "specificity")
+})
+dev.off()
+
+
+gene_list2 = c("ENSG00000166233", "ENSG00000166167",  "ENSG00000198561", "ENSG00000170315", "ENSG00000150991")
+
+#specificity plot for ARIH1, BTRC, UBB, UBC, CTNND1
+pdf("EWCE_plot_ctd_specificity2.pdf")
+try({
+  plt = EWCE::plot_ctd(ctd = my_ctd,
+                       level = 1,
+                       genes = gene_list2, 
+                       metric = "specificity")
+})
+dev.off()
+
+
+#background genes
+bg <- rownames(obj_subset)
+hits <- c("ENSG00000166233" , "ENSG00000166167", "ENSG00000163904", "ENSG00000198561", "ENSG00000170315", "ENSG00000150991", "ENSG00000118503", "ENSG00000168036", "ENSG00000187147", "ENSG00000089225", "ENSG00000144218", "ENSG00000164690")
+
+##### HITS: is a gene list that contains genes you want to test if they are enriched in any particulat cell type. (In our case the genes identified for the 2 regressions)
+##### All gene IDs are assumed by the package to be provided in gene symbol format (rather than Ensembl/Entrez). 
+##### BACKGROUND GENES: are the genes of your dataset that you want to test against
+
+#bootstrap enrichment test of gene sets
+results = EWCE::bootstrap_enrichment_test(
+  sct_data = my_ctd,
+  sctSpecies = "human",
+  sctSpecies_origin = "human",
+  genelistSpecies = "human",
+  annotLevel = annotLevel,
+  reps = reps,
+  hits = hits,
+  bg = bg,
+  no_cores = 20
+)
+
+write.csv(results, "dev_results.csv")
+
+
+try({
+  plot_list <- EWCE::ewce_plot(total_res = results$results,
+                             mtc_method ="BH",
+                               ctd = my_ctd) 
+  # print(plot_list$plain)
+})
+
+```
+

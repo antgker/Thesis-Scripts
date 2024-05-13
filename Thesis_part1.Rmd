@@ -1,0 +1,36 @@
+---
+title: "Thesis1"
+output: html_document
+date: "2024-05-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library loading}
+library(Seurat)
+```
+
+```{r Data reading}
+data = readRDS("C:/Users/Antonia/Desktop/ANTONIA/MTLS/Thesis_project/dev.rds")
+```
+
+```{r Standard Seurat pipeline}
+data <- CreateSeuratObject(counts = data@assays$RNA@counts, project = "dev")
+meta <- read.table("meta.tsv", row.names = 1, header = TRUE, sep = "\t", check.names = FALSE)
+colnames(meta) <- make.names(colnames(meta))
+
+data <- AddMetaData(data, meta, col.name = NULL)
+data <- NormalizeData(object = data)
+data <- FindVariableFeatures(object = data)
+data <- ScaleData(object = data, features = all.genes)
+data <- RunPCA(object = data)
+#use elbow plot to select significant PCs
+ElbowPlot(object = data, ndims = 40)
+data <- FindNeighbors(object = data, dims = 1:20)
+data <- FindClusters(object = data)
+data <- RunUMAP(object = data, dims = 1:20)
+saveRDS(data, file = "dev_processed.rds")
+```
+
